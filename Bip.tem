@@ -1,32 +1,36 @@
-
 begintemplate Bip
 
-public soma 
+public soma, voltage_vec, seclamp
 create soma
-objref vc
-  
-  proc init() { 
+objref vc, voltage_vec, seclamp
+
+  proc init() {
     create soma
 
     soma {
-        L=10 
-	diam=10 
-	nseg=1
-	insert pas
-	e_pas=-41
-	g_pas=.0077
-	insert ih
-	insert cad
-	depth_cad = 0.025
-	taur_cad=0.8
-	insert tsbp
-	insert IA
-	insert IKv
-	ek_IKv = -58
-	vc = new VClamp(0.5)
-       vc.dur[0]=100
-       vc.amp[0]=-37.9    
+        L=10
+    diam=10
+    nseg=1
+        insert pas
+        e_pas=-41
+        g_pas=.0077
+        insert ih
+        insert cad
+        depth_cad = 0.025
+        taur_cad=0.8
+        insert tsbp
+        insert IA
+        insert IKv
+        ek_IKv = -58
+        vc = new VClamp(0.5)
+           vc.dur[0]=100
+           vc.amp[0]=-37.9
     }
-  }	// end init()
+    
+    // Create vector to record voltage
+    voltage_vec = new Vector()
+    voltage_vec.record(&soma.v(0.5))
+    
+  } // end init()
 
 endtemplate Bip

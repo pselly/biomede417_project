@@ -1,13 +1,4 @@
-/*  Retina Model - SiSNe 
-
-Ribeirao Preto - S.P. - BRAZIL
-
-Author : Rodrigo Publio - publio@oist.jp 
-
-Last Version - 06/2009. */
-
-
-load_file("nrngui.hoc")	
+load_file("nrngui.hoc")
 load_file("parameters.hoc")
 load_file("createcells.hoc")
 load_file("gap.hoc")
@@ -15,22 +6,28 @@ load_file("netconnection.hoc")
 
 //============================Simulation Control=======================
 
+// Object references for saving and replaying data
+objref savefile, voltage_replay_vec, voltage_matrix, line, voltage_vecs
+
+// Flag to control whether to replay voltage
+USE_VOLTAGE_REPLAY = 1  // Set to 1 to enable replay, 0 to run normal simulation
+
 proc step() {
 
    if (ENABLE_GRAPHICAL_INTERFACE) Plot()
-   fadvance()   
+   fadvance()
   }
 
 proc init() {
-	
+
   finitialize()
   fcurrent()
   dt=step_dt
  }
- 
+
 //create_matrix(5,nrodbipx*nrodbipy)
 
-proc start() {	local i,j
+proc start() {  local i,j
 
 count=0
 printf("Amp=%g\n",amp)
@@ -39,20 +36,135 @@ block_ih(gihbar) // defined at createcells.hoc
 rod_gaps(PROB)  // defined at netconnection.hoc
 A2_gaps(0.25)   // defined at netconnection.hoc
 Glursyn()       // defined at netconnection.hoc
-load_file("session.ses")
 
+
+load_file("session.ses")  // Only load GUI session for normal runs
+
+
+// Check if we should replay voltage
+if (USE_VOLTAGE_REPLAY) {
+    replay_all_bipolar_voltages()
+}
 
 init()
 run()
-             
+
+// Save bipolar cell voltages after simulation (only if not replaying)
+if (!USE_VOLTAGE_REPLAY) {
+    save_all_bipolar_voltages()
+}
+
 } // end proc start
- 
+
+// Procedure to save all bipolar cell voltage data in a single file
+proc save_all_bipolar_voltages() {  local i, j, t, num_timepoints
+    savefile = new File()
+    savefile.wopen("all_bipolar_voltages.dat")
+
+    // Write header with metadata
+    savefile.printf("# All bipolar cell voltage recordings\n")
+    savefile.printf("# Grid size: %d x %d\n", nrodbipx, nrodbipy)
+    savefile.printf("# Simulation parameters: Amp=%g, tstop=%g ms, dt=%g ms\n", amp, tstop, dt)
+    savefile.printf("# Data format: Each line contains voltages for all cells at one timepoint\n")
+    savefile.printf("# Order: rod_bip[0][0], rod_bip[0][1], ..., rod_bip[0][%d], rod_bip[1][0], ..., rod_bip[%d][%d]\n", nrodbipy-1, nrodbipx-1, nrodbipy-1)
+    savefile.printf("# Total cells per timepoint: %d\n", nrodbipx * nrodbipy)
+    savefile.printf("# BEGIN_DATA\n")
+
+    // Get number of timepoints from first cell
+    num_timepoints = rod_bip[0][0].voltage_vec.size()
+
+    printf("Saving voltages: %d timepoints x %d cells\n", num_timepoints, nrodbipx * nrodbipy)
+
+    // Write data: each row is one timepoint, columns are cells in row-major order
+    for t = 0, num_timepoints-1 {
+        for i = 0, nrodbipx-1 {
+            for j = 0, nrodbipy-1 {
+                savefile.printf("%g", rod_bip[i][j].voltage_vec.x[t])
+                // Add space separator except after last cell
+                if (i < nrodbipx-1 || j < nrodbipy-1) {
+                    savefile.printf(" ")
+                }
+            }
+        }
+        savefile.printf("\n")
+    }
+
+    savefile.close()
+    printf("All bipolar voltage data saved to all_bipolar_voltages.dat\n")
+    printf("File size: %d timepoints x %d cells = %d data points\n", num_timepoints, nrodbipx * nrodbipy, num_timepoints * nrodbipx * nrodbipy)
+}
+
+// Procedure to load and replay voltage for all bipolar cells from file using SEClamp
+proc replay_all_bipolar_voltages() {  local i, j, t, num_timepoints, num_cells, cell_idx, val
+
+    line = new String()
+    savefile = new File()
+
+    if (!savefile.ropen("all_bipolar_voltages.dat")) {
+        printf("ERROR: Could not open all_bipolar_voltages.dat\n")
+        return
+    }
+
+    // Skip header lines until BEGIN_DATA
+    while (savefile.gets(line.s) != -1) {
+        if (strcmp(line.s, "# BEGIN_DATA\n") == 0) {
+            break
+        }
+    }
+
+    // Create a vector for each cell to store its voltage trajectory
+    voltage_vecs = new List()
+    num_cells = nrodbipx * nrodbipy
+    for i = 0, num_cells-1 {
+        voltage_vecs.append(new Vector())
+    }
+
+    // Read data line by line
+    num_timepoints = 0
+    while (savefile.gets(line.s) != -1) {
+        // Parse all voltages from this line (one timepoint)
+        cell_idx = 0
+        for i = 0, nrodbipx-1 {
+            for j = 0, nrodbipy-1 {
+                if (sscanf(line.s, "%*[ ]%lf%[^\n]", &val, line.s) == 2 || sscanf(line.s, "%lf%[^\n]", &val, line.s) == 2 || sscanf(line.s, "%lf", &val) == 1) {
+                    voltage_vecs.o(cell_idx).append(val)
+                }
+                cell_idx += 1
+            }
+        }
+        num_timepoints += 1
+    }
+    savefile.close()
+
+    printf("Loaded %d timepoints for %d cells from all_bipolar_voltages.dat\n", num_timepoints, num_cells)
+
+    // Set up SEClamp for each bipolar cell and play its voltage trajectory
+    cell_idx = 0
+    for i = 0, nrodbipx-1 {
+        for j = 0, nrodbipy-1 {
+            // Create SEClamp to force voltage
+            rod_bip[i][j].soma {
+                rod_bip[i][j].seclamp = new SEClamp(0.5)
+                rod_bip[i][j].seclamp.dur1 = tstop
+                rod_bip[i][j].seclamp.rs = 0.001  // very low series resistance
+            }
+
+            // Play this cell's voltage trajectory
+            voltage_vecs.o(cell_idx).play(&rod_bip[i][j].seclamp.amp1, dt)
+
+            cell_idx += 1
+        }
+    }
+
+    printf("Voltage replay configured with SEClamp for all %d x %d bipolar cells\n", nrodbipx, nrodbipy)
+}
+
 tstop=1
 run()
-init() 
-tstop=10000 
- 
-xpanel("Publio et al. 2009")	      
-xlabel("Press below button to start simulation:")	      
-xbutton("Start (takes 1/2 hr on 2.8 GHz Pentium 4)","start()")	      
-xpanel()	      
+init()
+tstop=5000
+
+xpanel("Publio et al. 2009")
+xlabel("Press below button to start simulation:")
+xbutton("Start (takes 1/2 hr on 2.8 GHz Pentium 4)","start()")
+xpanel()
