@@ -26,12 +26,16 @@ random = new Random(seed)
 //                      RP Disease Parameter
 //=================================================================
 // we try to randomly pick some cells to dead mode (lose junctions?
-//10% of the rod cells are healthy, others are dead
-rod_left = 0.1 //
-cone_left = 0.5 //
+//1&1, 40%&70%,10%&50%
 
+rod_left = 1
+cone_left = 1
 
+/*rod_left = 0.4
+cone_left = 0.7*/
 
+/*rod_left = 0.1
+cone_left = 0.5*/
 
 
 
@@ -46,12 +50,8 @@ print "Creating cells. This may take some time."
 
 
 
-
-
  for i = 0, nrodx-1 {
    for j = 0, nrody-1 {
-
-
     //use uniform to generate random number and represent cell status
      if (random.uniform(0, 1) <= rod_left) {
        rod_healthy[i][j] = 1
@@ -62,9 +62,6 @@ print "Creating cells. This may take some time."
      }
    }
  }
-
-
-
 
 
 
@@ -144,9 +141,6 @@ print "Creating cells. This may take some time."
 
 
 
-
-
-
 proc insert_iclamps() { local k,m,ii,jj   // 1 arg - amp
 count = 0 // loop 1: see if the cell is healthy;loop2: see it's bright or dark
  while (count < InputNumber) {
@@ -158,6 +152,12 @@ count = 0 // loop 1: see if the cell is healthy;loop2: see it's bright or dark
      if (jj == nrody) {
      jj = nrody - 1
      }
+
+
+     rod_healthy[10][10] = 1
+     cone_healthy[2][3] = 1
+
+
 
      if (rod_healthy[ii][jj] == 1) {
          if ($1 >= 30) {
@@ -172,11 +172,6 @@ count = 0 // loop 1: see if the cell is healthy;loop2: see it's bright or dark
          brightcurr[ii][jj].amp = 0
          dimcurr[ii][jj].amp    = 0
      }
-
-
-
-
-
 
 
 
@@ -198,31 +193,10 @@ count = 0 // loop 1: see if the cell is healthy;loop2: see it's bright or dark
  }
 
 
-
-
-
-
 InputNumber =   ($2/100)*rodtotal
 
 
  printf ("\n%d Rods receiving input\n",InputNumber)
-
-
-//  for k = 0, nrodx-1 {
-//    for m = 0, nrody-1 {
-//      rod[k][m].soma brightcurr[k][m] = new IinjLT(0.5)
-//      brightcurr[k][m].del = stim_init
-//      brightcurr[k][m].ton = 6000
-//      // brightcurr[k][m].amp =0
-//      brightcurr[k][m].amp =0
-//
-//      rod[k][m].soma dimcurr[k][m] = new IinjLTDim(0.5)
-//      dimcurr[k][m].del = stim_init
-//      dimcurr[k][m].ton = 6000
-//      dimcurr[k][m].ssI=0
-//      dimcurr[k][m].amp =0
-//  }
-//   }
 
 
 
@@ -265,10 +239,6 @@ InputNumber =   ($2/100)*rodtotal
 
 
 
-
-
-
-
 for k = 0, nconex-1 {   // Dark current in cones
    for m = 0, nconey-1 {
      cone[k][m].soma input_cone[k][m] = new IinjLT_cone(0.5)
@@ -279,22 +249,7 @@ for k = 0, nconex-1 {   // Dark current in cones
   }
 
 
-/*for i=0,InputNumber {
 
-
- ii = int(random.uniform(0, nrodx))
- if (ii == nrodx ) { ii=nrodx-1 }
- jj = int(random.uniform(0, nrody))
- if (jj == nrody ) { jj=nrody-1 }
- if ($1>=30) {
-
-
- brightcurr[ii][jj].amp = $1}else{
- dimcurr[ii][jj].amp = $1}
- i=i+1
-
-
-   }*/
  count = 0 // loop 1: see if the cell is healthy;loop2: see it's bright or dark
    while (count < InputNumber) {
        ii = int(random.uniform(0, nrodx))
@@ -308,6 +263,7 @@ for k = 0, nconex-1 {   // Dark current in cones
 
 
        rod_healthy[10][10] = 1
+       rod_healthy[40][25] = 0
 
 
        if (rod_healthy[ii][jj] == 1) {
@@ -326,35 +282,15 @@ for k = 0, nconex-1 {   // Dark current in cones
 
 
 
-
-
-
-
-
-       /*if (cone_healthy[ii][jj] == 1) {
-           if ($1 >= 30) {
-               brightcurr[ii][jj].amp = $1
-               dimcurr[ii][jj].amp    = 0
-           } else {
-               dimcurr[ii][jj].amp    = $1
-               brightcurr[ii][jj].amp = 0
-           }
-           count = count + 1
-       } else {
-           brightcurr[ii][jj].amp = 0
-           dimcurr[ii][jj].amp    = 0
-       }
-
-
-   }*/
  }// end proc
+}
 
 
 //=================================================================
 //                      Change Ih conductance                   //
 //=================================================================
 
-}
+
 proc block_ih(){
 
 
@@ -375,4 +311,5 @@ printf ("%d Cones created\n",conetotal)
 printf ("%d Bipolar cells created\n",nrodbipx*nrodbipy)
 printf ("%d A2 Amacrine cells created\n",A2total)
 printf ("%d Ganglion cells created\n",gantotal)
+
 
